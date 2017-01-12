@@ -19,7 +19,7 @@
         var self:any = this;
         // 这里要判断一下是否是http请求，如果是则改用XMLHttpRequest去请求图片
         var protocol:string = value.substring(0, value.indexOf(":"));
-        if(protocol == "http" || protocol == "https")
+        if(protocol == "http" || protocol == "https" || protocol == "")
         {
             if(this._xhr == null)
             {

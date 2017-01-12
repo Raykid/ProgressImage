@@ -17,7 +17,7 @@
         var self = this;
         // 这里要判断一下是否是http请求，如果是则改用XMLHttpRequest去请求图片
         var protocol = value.substring(0, value.indexOf(":"));
-        if (protocol == "http" || protocol == "https") {
+        if (protocol == "http" || protocol == "https" || protocol == "") {
             if (this._xhr == null) {
                 // 还没初始化过，初始化
                 this._xhr = new XMLHttpRequest();
@@ -92,7 +92,7 @@
 window.onload = function () {
     // 这里可以生成包装好的Image
     var img = document.createElement("img");
-    img.src = "http://img95.699pic.com/photo/00037/9614.jpg_wh860.jpg";
+    img.src = "test.jpg";
     img.onprogress = function (evt) {
         if (evt.lengthComputable) {
             console.log(evt.loaded / evt.total);

@@ -7,7 +7,7 @@ window.onload = ()=>
 {
     // 这里可以生成包装好的Image
     var img:HTMLImageElement = document.createElement("img");
-    img.src = "http://img95.699pic.com/photo/00037/9614.jpg_wh860.jpg";
+    img.src = "test.jpg";
     img.onprogress = (evt:ProgressEvent)=>{
         if(evt.lengthComputable)
         {
