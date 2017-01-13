@@ -6,6 +6,43 @@
  */
 (function():void
 {
+    var waitXHR:XMLHttpRequest[] = [];
+
+    function queueSendXHR(xhr:XMLHttpRequest):void
+    {
+        if(waitXHR.indexOf(xhr) < 0)
+        {
+            waitXHR.push(xhr);
+            xhr.addEventListener("abort", nextXHR);
+            xhr.addEventListener("error", nextXHR);
+            xhr.addEventListener("timeout", nextXHR);
+            xhr.addEventListener("load", nextXHR);
+            nextXHR.call(xhr);
+        }
+    }
+
+    function nextXHR():void
+    {
+        var xhr:XMLHttpRequest = this;
+        if(waitXHR.indexOf(xhr) == 0)
+        {
+            if(xhr.readyState == XMLHttpRequest.DONE)
+            {
+                xhr.removeEventListener("abort", nextXHR);
+                xhr.removeEventListener("error", nextXHR);
+                xhr.removeEventListener("timeout", nextXHR);
+                xhr.removeEventListener("load", nextXHR);
+                waitXHR.shift();
+            }
+            // 加载下一个
+            xhr = waitXHR[0];
+            if(xhr && xhr.readyState == XMLHttpRequest.OPENED)
+            {
+                xhr.send();
+            }
+        }
+    }
+
     // 定义原型属性
     utils.changeProperty(HTMLImageElement, "src", {
         enumerable: true,
@@ -26,13 +63,13 @@
                     // 还没初始化过，初始化
                     this._xhr = new XMLHttpRequest();
                     this._xhr.responseType = "arraybuffer";
-                    this._xhr.onabort = middleListener;
-                    this._xhr.onerror = middleListener;
-                    this._xhr.onloadend = middleListener;
-                    this._xhr.onloadstart = middleListener;
-                    this._xhr.onprogress = middleListener;
-                    this._xhr.ontimeout = middleListener;
-                    this._xhr.onload = function():void
+                    this._xhr.addEventListener("abort", middleListener);
+                    this._xhr.addEventListener("error", middleListener);
+                    this._xhr.addEventListener("loadend", middleListener);
+                    this._xhr.addEventListener("loadstart", middleListener);
+                    this._xhr.addEventListener("progress", middleListener);
+                    this._xhr.addEventListener("timeout", middleListener);
+                    this._xhr.addEventListener("load", function():void
                     {
                         // load事件要单独处理，因为要解析二进制数据
                         var blob:Blob = new Blob([self._xhr.response]);
@@ -41,12 +78,12 @@
                         self.$src = url;
                         // 移除临时URL，必须推迟到下一帧进行，否则取不到url
                         setTimeout(URL.revokeObjectURL, 0, url);
-                    };
+                    });
                 }
                 // 改用XMLHttpRequest加载，然后触发progress事件
                 if(this._xhr.status != XMLHttpRequest.UNSENT) this._xhr.abort();
                 this._xhr.open("GET", value, true);
-                this._xhr.send();
+                queueSendXHR(this._xhr);
             }
             else
             {
