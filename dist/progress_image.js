@@ -78,12 +78,12 @@ var utils;
                         var blob = new Blob([self._xhr.response]);
                         var url = URL.createObjectURL(blob);
                         // 开始真实加载
-                        callOri(url);
+                        self.$src = url;
                         // 移除临时URL，必须推迟到下一帧进行，否则取不到url
                         setTimeout(URL.revokeObjectURL, 0, url);
                     };
                 }
-                // 改用XMLHttpRequest加载，然后出发progress事件
+                // 改用XMLHttpRequest加载，然后触发progress事件
                 if (this._xhr.status != XMLHttpRequest.UNSENT)
                     this._xhr.abort();
                 this._xhr.open("GET", value, true);
@@ -91,7 +91,7 @@ var utils;
             }
             else {
                 // 非HTTP请求仍然使用基类提供的方法
-                callOri(value);
+                this.$src = value;
             }
             function middleListener(evt) {
                 // 拷贝事件对象
@@ -102,10 +102,6 @@ var utils;
                 newEvt.total = evt.total;
                 // 转发事件
                 self.dispatchEvent(newEvt);
-            }
-            function callOri(value) {
-                // 调用原始的src属性
-                self.$src = value;
             }
         }
     });
