@@ -11,12 +11,10 @@ window.onload = ()=>
     img.onprogress = (evt:ProgressEvent)=>{
         if(evt.lengthComputable)
         {
-            console.log(evt.loaded / evt.total);
+            var div:HTMLDivElement = document.createElement("div");
+            div.innerText = "" + (evt.loaded / evt.total);
+            document.body.appendChild(div);
         }
     };
     document.body.appendChild(img);
-    // 这里可以生成其他标签
-    var div:HTMLDivElement = document.createElement("div");
-    div.innerText = "fuck";
-    document.body.appendChild(div);
 };

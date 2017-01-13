@@ -1,88 +1,113 @@
 /**
+ * Created by Raykid on 2017/1/13.
+ * 使用这个工具可以改变某个类的属性实现，包括js或者dom自建的类
+ */
+var utils;
+(function (utils) {
+    function changeProperty(obj, key, attrs) {
+        var target = obj;
+        while (true) {
+            if (target == null)
+                return obj;
+            if (target.hasOwnProperty(key))
+                break;
+            // 如果是类型则要用prototype回溯，否则用__proto__回溯
+            target = (typeof target == "function" ? target.prototype : target["__proto__"]);
+        }
+        // 记录下原始数据
+        var oriAttrs = Object.getOwnPropertyDescriptor(target, key);
+        // 开始篡改属性
+        Object.defineProperty(target, key, attrs);
+        // 插入一个$属性，用于获取原始属性
+        Object.defineProperty(target, "$" + key, {
+            configurable: oriAttrs.configurable,
+            enumerable: oriAttrs.enumerable,
+            get: function () {
+                // 暂时恢复被篡改的方法
+                Object.defineProperty(target, key, oriAttrs);
+                // 调用原始属性
+                var res = this[key];
+                // 恢复成被篡改的状态
+                Object.defineProperty(target, key, attrs);
+                // 返回数据
+                return res;
+            },
+            set: function (value) {
+                // 暂时恢复被篡改的方法
+                Object.defineProperty(target, key, oriAttrs);
+                // 调用原始属性
+                this[key] = value;
+                // 恢复成被篡改的状态
+                Object.defineProperty(target, key, attrs);
+            }
+        });
+    }
+    utils.changeProperty = changeProperty;
+})(utils || (utils = {}));
+/// <reference path="utils/ChangePropertyUtil.ts"/>
+/**
  * Created by Raykid on 2017/1/11.
  * 引用该文件会对HTMLImageElement进行修改，增加progress事件的派发
  */
 (function () {
-    // 替换document.createElement方法，使其在参数为img时生成Image而不是HTMLImageElement
-    var temp = document.createElement;
-    document.createElement = function (tagName) {
-        if (tagName == "img")
-            return new Image();
-        return temp.call(this, tagName);
-    };
-    // 生成getter方法
-    var getter = function () { return this.__oriSrc; };
-    var setter = function (value) {
-        this.__oriSrc = value;
-        var self = this;
-        // 这里要判断一下是否是http请求，如果是则改用XMLHttpRequest去请求图片
-        var protocol = value.substring(0, value.indexOf(":"));
-        if (protocol == "http" || protocol == "https" || protocol == "") {
-            if (this._xhr == null) {
-                // 还没初始化过，初始化
-                this._xhr = new XMLHttpRequest();
-                this._xhr.responseType = "arraybuffer";
-                this._xhr.onabort = middleListener;
-                this._xhr.onerror = middleListener;
-                this._xhr.onloadend = middleListener;
-                this._xhr.onloadstart = middleListener;
-                this._xhr.onprogress = middleListener;
-                this._xhr.ontimeout = middleListener;
-                this._xhr.onload = function () {
-                    // load事件要单独处理，因为要解析二进制数据
-                    var blob = new Blob([self._xhr.response]);
-                    var url = URL.createObjectURL(blob);
-                    // 开始真实加载
-                    callOri(url);
-                    // 移除临时URL，必须推迟到下一帧进行，否则取不到url
-                    setTimeout(URL.revokeObjectURL, 0, url);
-                };
-            }
-            // 改用XMLHttpRequest加载，然后出发progress事件
-            if (this._xhr.status != XMLHttpRequest.UNSENT)
-                this._xhr.abort();
-            this._xhr.open("GET", value, true);
-            this._xhr.send();
-        }
-        else {
-            // 非HTTP请求仍然使用基类提供的方法
-            callOri(value);
-        }
-        function middleListener(evt) {
-            // 拷贝事件对象
-            var newEvt = document.createEvent(evt.constructor["name"]);
-            newEvt.initEvent(evt.type, evt.bubbles, evt.cancelable);
-            var keys = Object.keys(evt["__proto__"]);
-            for (var i in keys) {
-                var key = keys[i];
-                Object.defineProperty(newEvt, key, {
-                    writable: false,
-                    value: evt[key]
-                });
-            }
-            // 转发事件
-            var callback = self["on" + newEvt.type];
-            callback && callback.call(self, newEvt);
-            self.dispatchEvent(newEvt);
-        }
-        function callOri(value) {
-            // 暂时删除Image的原型src属性，因为我们要调用原始的src定义
-            delete Image.prototype["src"];
-            // 调用原始的src属性
-            self.src = value;
-            // 调用完了，恢复src的篡改定义
-            Object.defineProperty(Image.prototype, "src", {
-                configurable: true,
-                get: getter,
-                set: setter
-            });
-        }
-    };
     // 定义原型属性
-    Object.defineProperty(Image.prototype, "src", {
+    utils.changeProperty(HTMLImageElement, "src", {
+        enumerable: true,
         configurable: true,
-        get: getter,
-        set: setter
+        get: function () {
+            return this.__oriSrc;
+        },
+        set: function (value) {
+            this.__oriSrc = value;
+            var self = this;
+            // 这里要判断一下是否是http请求，如果是则改用XMLHttpRequest去请求图片
+            var protocol = value.substring(0, value.indexOf(":"));
+            if (protocol == "http" || protocol == "https" || protocol == "") {
+                if (this._xhr == null) {
+                    // 还没初始化过，初始化
+                    this._xhr = new XMLHttpRequest();
+                    this._xhr.responseType = "arraybuffer";
+                    this._xhr.onabort = middleListener;
+                    this._xhr.onerror = middleListener;
+                    this._xhr.onloadend = middleListener;
+                    this._xhr.onloadstart = middleListener;
+                    this._xhr.onprogress = middleListener;
+                    this._xhr.ontimeout = middleListener;
+                    this._xhr.onload = function () {
+                        // load事件要单独处理，因为要解析二进制数据
+                        var blob = new Blob([self._xhr.response]);
+                        var url = URL.createObjectURL(blob);
+                        // 开始真实加载
+                        callOri(url);
+                        // 移除临时URL，必须推迟到下一帧进行，否则取不到url
+                        setTimeout(URL.revokeObjectURL, 0, url);
+                    };
+                }
+                // 改用XMLHttpRequest加载，然后出发progress事件
+                if (this._xhr.status != XMLHttpRequest.UNSENT)
+                    this._xhr.abort();
+                this._xhr.open("GET", value, true);
+                this._xhr.send();
+            }
+            else {
+                // 非HTTP请求仍然使用基类提供的方法
+                callOri(value);
+            }
+            function middleListener(evt) {
+                // 拷贝事件对象
+                var newEvt = document.createEvent("Event");
+                newEvt.initEvent(evt.type, evt.bubbles, evt.cancelable);
+                newEvt.lengthComputable = evt.lengthComputable;
+                newEvt.loaded = evt.loaded;
+                newEvt.total = evt.total;
+                // 转发事件
+                self.dispatchEvent(newEvt);
+            }
+            function callOri(value) {
+                // 调用原始的src属性
+                self.$src = value;
+            }
+        }
     });
 })();
 /// <reference path="../src/ProgressImage.ts"/>
@@ -95,13 +120,11 @@ window.onload = function () {
     img.src = "test.jpg";
     img.onprogress = function (evt) {
         if (evt.lengthComputable) {
-            console.log(evt.loaded / evt.total);
+            var div = document.createElement("div");
+            div.innerText = "" + (evt.loaded / evt.total);
+            document.body.appendChild(div);
         }
     };
     document.body.appendChild(img);
-    // 这里可以生成其他标签
-    var div = document.createElement("div");
-    div.innerText = "fuck";
-    document.body.appendChild(div);
 };
 //# sourceMappingURL=test.js.map
