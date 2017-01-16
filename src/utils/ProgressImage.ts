@@ -1,9 +1,22 @@
-/// <reference path="utils/ChangePropertyUtil.ts"/>
+/// <reference path="ChangePropertyUtil.ts"/>
 
 /**
  * Created by Raykid on 2017/1/11.
  * 引用该文件会对HTMLImageElement进行修改，增加progress事件的派发
  */
+namespace utils
+{
+    export function openProgressImage():void
+    {
+        utils.changeProperty(HTMLImageElement, "src", utils["_propDesc"]);
+    }
+
+    export function closeProgressImage():void
+    {
+        utils.recoverProperty(HTMLImageElement, "src");
+    }
+}
+
 (function():void
 {
     var waitXHR:XMLHttpRequest[] = [];
@@ -44,7 +57,7 @@
     }
 
     // 定义原型属性
-    utils.changeProperty(HTMLImageElement, "src", {
+    utils["_propDesc"] = {
         enumerable: true,
         configurable: true,
         get: function():string{
@@ -103,5 +116,5 @@
                 self.dispatchEvent(newEvt);
             }
         }
-    });
+    };
 })();

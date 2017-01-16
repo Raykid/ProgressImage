@@ -4,7 +4,8 @@
  */
 var utils;
 (function (utils) {
-    function changeProperty(obj, key, attrs) {
+    var _oriAttrsDict = {};
+    function getTarget(obj, key) {
         var target = obj;
         while (true) {
             if (target == null)
@@ -14,8 +15,13 @@ var utils;
             // 如果是类型则要用prototype回溯，否则用__proto__回溯
             target = (typeof target == "function" ? target.prototype : target["__proto__"]);
         }
+        return target;
+    }
+    function changeProperty(obj, key, attrs) {
+        var target = getTarget(obj, key);
         // 记录下原始数据
         var oriAttrs = Object.getOwnPropertyDescriptor(target, key);
+        _oriAttrsDict[target.constructor.name + "_" + key] = oriAttrs;
         // 开始篡改属性
         Object.defineProperty(target, key, attrs);
         // 插入一个$属性，用于获取原始属性
@@ -43,12 +49,39 @@ var utils;
         });
     }
     utils.changeProperty = changeProperty;
+    function recoverProperty(obj, key) {
+        var target = getTarget(obj, key);
+        // 取出原始数据
+        var tempKey = target.constructor.name + "_" + key;
+        var oriAttrs = _oriAttrsDict[tempKey];
+        delete _oriAttrsDict[tempKey];
+        if (oriAttrs == null)
+            return obj;
+        // 恢复被篡改的属性
+        Object.defineProperty(target, key, oriAttrs);
+        // 移除$属性
+        delete target["$" + key];
+        // 返回
+        return obj;
+    }
+    utils.recoverProperty = recoverProperty;
 })(utils || (utils = {}));
-/// <reference path="utils/ChangePropertyUtil.ts"/>
+/// <reference path="ChangePropertyUtil.ts"/>
 /**
  * Created by Raykid on 2017/1/11.
  * 引用该文件会对HTMLImageElement进行修改，增加progress事件的派发
  */
+var utils;
+(function (utils) {
+    function openProgressImage() {
+        utils.changeProperty(HTMLImageElement, "src", utils["_propDesc"]);
+    }
+    utils.openProgressImage = openProgressImage;
+    function closeProgressImage() {
+        utils.recoverProperty(HTMLImageElement, "src");
+    }
+    utils.closeProgressImage = closeProgressImage;
+})(utils || (utils = {}));
 (function () {
     var waitXHR = [];
     function queueSendXHR(xhr) {
@@ -79,7 +112,7 @@ var utils;
         }
     }
     // 定义原型属性
-    utils.changeProperty(HTMLImageElement, "src", {
+    utils["_propDesc"] = {
         enumerable: true,
         configurable: true,
         get: function () {
@@ -132,13 +165,14 @@ var utils;
                 self.dispatchEvent(newEvt);
             }
         }
-    });
+    };
 })();
-/// <reference path="../src/ProgressImage.ts"/>
+/// <reference path="../src/utils/ProgressImage.ts"/>
 /**
  * Created by Raykid on 2016/12/23.
  */
 window.onload = function () {
+    utils.openProgressImage();
     // 这里可以生成包装好的Image
     var img = document.createElement("img");
     img.src = "test.jpg";
@@ -148,6 +182,19 @@ window.onload = function () {
             div.innerText = "" + (evt.loaded / evt.total);
             document.body.appendChild(div);
         }
+    };
+    img.onload = function () {
+        utils.closeProgressImage();
+        var img = document.createElement("img");
+        img.src = "test.jpg";
+        img.onprogress = function (evt) {
+            if (evt.lengthComputable) {
+                var div = document.createElement("div");
+                div.innerText = "" + (evt.loaded / evt.total);
+                document.body.appendChild(div);
+            }
+        };
+        document.body.appendChild(img);
     };
     document.body.appendChild(img);
 };
